@@ -17,7 +17,9 @@ coach:[{type: mongoose.Types.ObjectId, required: true, ref: 'User'}],
 gender:{type: Number, required: false},
 //1 male 2 female
 age: {type: Number, required: false},
-checkins:[{type: mongoose.Types.ObjectId, required: true, ref: 'Checkin'}]
+checkins:[{type: mongoose.Types.ObjectId, required: true, ref: 'Checkin'}],
+dateJoined: {type: Object, required: true},
+code: {type: String, required: true}
 })
 
 

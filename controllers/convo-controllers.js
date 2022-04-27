@@ -20,27 +20,58 @@ const getConvos = async (req, res, next) => {
   }
 
   const userId = req.params.uid
-  const {role} = req.body
-  let allConvos;
-  let convos;
+  // const { role } = req.body
 
 
+  let user
   try {
-    allConvos = await Convo.find()
+    user = await User.findById(userId)
   } catch (err) {
-    const error = new HttpError('Could not fetch convos', 500)
+    const error = new HttpError('Could not fetch user', 500)
     return next(error)
   }
 
-  //check if token is of this user
+  let role = user.role;
 
-  convos = allConvos.filter(c => c[role] !== userId)
+  let convos;
 
 
 
+  if (role ==='client') {
+    try {
+      convos = await Convo.find({ client: userId})
+    } catch (err) {
+      const error = new HttpError('Could not fetch convos', 500)
+      return next(error)
+    }
+
+  }
+
+  if (role ==='coach') {
+    try {
+      convos = await Convo.find({ coach: userId})
+    } catch (err) {
+      const error = new HttpError('Could not fetch convos', 500)
+      return next(error)
+    }
+
+  }
+
+
+
+  console.log(role, userId, convos)
+
+  if (!convos) {
+    const error = new HttpError('No convos with this user id', 500)
+    return next(error)
+  }
   res.json({convos: convos.map(c => c.toObject({getters: true}))})
 
 }
+
+
+
+
 
 const updateAddConvo = async (req, res, next) => {
   const errors = validationResult(req)
@@ -63,7 +94,24 @@ const updateAddConvo = async (req, res, next) => {
     return next(error);
   }
 
-  let newImage;
+  let imageUrl;
+
+  let uploadedResponse;
+  if (image) {
+    try {
+      uploadedResponse = await cloudinary.uploader.upload(image, {
+        upload_preset: 'coach-production',
+      });
+      console.log(uploadedResponse);
+    } catch (err) {
+      const error = new HttpError(
+        'Couldnt upload this image to cloudinary',
+        500
+      );
+      return next(error);
+    }
+    imageUrl = uploadedResponse.url;
+  }
   // for cloudinary link
 
 
@@ -77,7 +125,7 @@ const stringMonth = monthArray[month - 1]
 
 //check if token id is the actual role and id of someone in the conversation
 
-convo.messages= [...convo.messages, {message: message, user: userId, date: {fullDate: today, month: month, day: day, year: year, time:codeTime, monthString: stringMonth}, image: newImage }]
+convo.messages= [...convo.messages, {message: message, user: userId, date: {fullDate: today, month: month, day: day, year: year, time:codeTime, monthString: stringMonth}, image: imageUrl }]
 if (role === 'client') {
   convo.coachNotifications = convo.coachNotifications + 1
 }

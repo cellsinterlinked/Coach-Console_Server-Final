@@ -537,40 +537,34 @@ const createCheckin = async (req, res, next) => {
   res.status(200).json({ checkin: createdCheckin.toObject({ getters: true }) });
 };
 
+
+
+
+
+
 const deleteCheckin = async (req, res, next) => {
-  const { checkinId, clientId } = req.body;
+  const checkinId = req.params.cid
 
-  //check if token is same as client Id
-
-  let client;
   let checkin;
 
-  try {
-    client = await User.findById(clientId);
-  } catch (err) {
-    const error = new HttpError(
-      'Could not find a client with the given id',
-      500
-    );
-    return next(error);
-  }
 
   try {
-    checkin = await Checkin.findById(checkinId);
+    checkin = await Checkin.findById(checkinId).populate('client')
   } catch (err) {
     const error = new HttpError(
       'Could not find a checkin with the given id',
       500
-    );
-    return next(error);
-  }
+      );
+      return next(error);
+    }
+
 
   try {
     const sess = await mongoose.startSession();
     sess.startTransaction();
     await checkin.remove({ session: sess });
-    client.checkins.pull(checkin);
-    await client.save({ session: sess });
+    checkin.client.checkins.pull(checkin);
+    await checkin.client.save({ session: sess });
     await sess.commitTransaction();
   } catch (err) {
     const error = new HttpError(`Could not delete this checkin ${err}`, 500);
@@ -579,6 +573,16 @@ const deleteCheckin = async (req, res, next) => {
 
   res.status(200).json({ message: 'checkin deleted' });
 };
+
+
+
+
+
+
+
+
+
+
 
 const getCheckins = async (req, res, next) => {
   const clientId = req.params.uid;

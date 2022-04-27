@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken');
 const req = require('express/lib/request');
 const user = require('../models/user');
 const { cloudinary } = require('../utils/cloudinary');
+const Str = require('@supercharge/strings');
 
 const createUser = async (req, res, next) => {
   const errors = validationResult(req);
@@ -23,7 +24,8 @@ const createUser = async (req, res, next) => {
     );
   }
 
-  const { password, email, role } = req.body;
+  const { password, email, role, coachCode } = req.body;
+  //add logic to match coach with coachCode
   let existingEmail;
 
   try {
@@ -41,6 +43,42 @@ const createUser = async (req, res, next) => {
     return next(error);
   }
 
+  let code = Str.random().slice(0, 10);
+
+  // if role is client
+  let codedUser;
+  let coachId = []
+
+  if (role === 'client' && coachCode) {
+    try {
+      codedUser = await User.findOne({code: coachCode})
+    } catch (err) {
+      const error = newHttpError('Couldnt find a coach with this code', 500);
+      return next(error);
+    }
+    if (!codedUser) {
+      const error = new HttpError(
+        ' Could not find a coach with this code',
+        422
+      );
+      return next(error);
+    } else {
+      coachId = codedUser.id
+    }
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
   let hashedPassword;
   try {
     hashedPassword = await bcrypt.hash(password, 12);
@@ -49,21 +87,58 @@ const createUser = async (req, res, next) => {
     return next(error);
   }
 
+
+
+  const monthArray = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  const today = new Date();
+  const month = today.getMonth() + 1;
+  const day = today.getDate();
+  const year = today.getFullYear();
+  const codeTime = today.getTime();
+  const stringMonth = monthArray[month - 1];
+
+  dateJoined = {
+    fullDate: today,
+    month: month,
+    day: day,
+    year: year,
+    time: codeTime,
+    monthString: stringMonth,
+  };
+
   const createdUser = new User({
     email,
     password: hashedPassword,
     role,
     workouts: [],
-    image: '',
+    image:
+      'https://res.cloudinary.com/dbnapmpvm/image/upload/v1650386345/coachProd/CA1FBEAB-E7C5-43FC-BFAF-ABFB12A5CB47_4_5005_c_gfahev.jpg',
     workouts: [],
     name: '',
     diets: [],
     conversations: [],
     clients: [],
-    coach: [],
+    coach: coachId,
     gender: 0,
     age: 0,
+    dateJoined: dateJoined,
+    code: code,
   });
+
+  console.log(createdUser);
 
   try {
     await createdUser.save();
@@ -84,6 +159,43 @@ const createUser = async (req, res, next) => {
     return next(error);
   }
 
+  if (role === 'client') {
+    const createdConvo = new Convo({
+      coach: codedUser.id,
+      client: createdUser.id,
+      messages: [],
+      clientNotifications: 0,
+      coachNotifications: 0
+    })
+
+    try {
+      await createdConvo.save();
+    } catch (err) {
+      const error = new HttpError('Creating convo failed 1 ', 500);
+      return next(error);
+    }
+
+    codedUser.clients.push(createdUser.id);
+    codedUser.conversations.push(createdConvo.id);
+    createdUser.conversations.push(createdConvo.id);
+
+    try {
+      codedUser.save();
+    } catch (err) {
+      const error = new HttpError('could not update coach list of clients', 500);
+      return next(error);
+    }
+
+    try {
+      createdUser.save();
+    } catch (err) {
+      const error = new HttpError('could not update the client', 500);
+      return next(error);
+    }
+
+  }
+
+
   res.status(201).json({
     userId: createdUser.id,
     email: createdUser.email,
@@ -91,6 +203,10 @@ const createUser = async (req, res, next) => {
     userName: createdUser.userName,
   });
 };
+
+
+
+
 
 const login = async (req, res, next) => {
   const errors = validationResult(req);
@@ -141,7 +257,11 @@ const login = async (req, res, next) => {
   let token;
   try {
     token = jwt.sign(
-      { userId: existingUser.id, email: existingUser.email, role: existingUser.role },
+      {
+        userId: existingUser.id,
+        email: existingUser.email,
+        role: existingUser.role,
+      },
       'supersecret_dont_share',
       { expiresIn: '1h' }
     );
@@ -285,7 +405,9 @@ const getClients = async (req, res, next) => {
     return next(error);
   }
 
-  res.json({ users: clients.map((user) => user.toObject({ getters: true })) });
+  res.json({
+    clients: clients.map((user) => user.toObject({ getters: true })),
+  });
 };
 
 const addClient = async (req, res, next) => {
@@ -474,6 +596,11 @@ const removeClient = async (req, res, next) => {
   });
 };
 
+
+
+
+
+
 const getAllUserData = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -494,8 +621,10 @@ const getAllUserData = async (req, res, next) => {
   let diets;
   let checkins;
   let userCheckins;
-
+  let code;
   let coach;
+
+  let clientCheckins;
   // checkins for clients?
 
   try {
@@ -505,16 +634,17 @@ const getAllUserData = async (req, res, next) => {
     return next(error);
   }
 
-  let coachId = user.coach[0]
+  code = user.code;
 
-  if (user.role === 'Client') {
+  let coachId = user.coach[0];
+
+  if (user.role === 'client') {
     try {
-      coach = await User.findById(coachId)
+      coach = await User.findById(coachId);
     } catch (err) {
       const error = new HttpError('Coach doesnt exist', 500);
       return next(error);
     }
-
   }
   try {
     convos = await Convo.find({ _id: user.conversations });
@@ -540,6 +670,8 @@ const getAllUserData = async (req, res, next) => {
     const error = new HttpError('your client search didnt work', 500);
     return next(error);
   }
+
+  console.log(clients)
   try {
     checkins = await Checkin.find({ client: user.clients });
   } catch (err) {
@@ -555,24 +687,126 @@ const getAllUserData = async (req, res, next) => {
     return next(error);
   }
 
+  try {
+    clientCheckins = await Checkin.find({ coach: userId });
+  } catch (err) {
+    const error = new HttpError('couldnt find the checkins of your clients');
+    return next(error);
+  }
+  console.log('made it this far');
+  let orderedCheckins = clientCheckins.sort(function (a, b) {
+    return a.date.time - b.date.time;
+  });
+
+  let clientTotals = [];
+  let workoutTotals = [];
+  let dietTotals = [];
+  let checkinTotals = [];
+// this is just the client id. Need whole client info.
+  if (clients) {
+    for (let i = 0; i < clients.length; i++) {
+      clientTotals.push({
+        value: i + 1,
+        date: `${clients[i].dateJoined.monthString.slice(0, 3).toUpperCase()} ${
+          clients[i].dateJoined.day
+        }`,
+      });
+    }
+  }
+
+  console.log(workouts);
+
+  if (workouts && workouts.length > 0) {
+    for (let i = 0; i < workouts.length; i++) {
+      workoutTotals.push({
+        value: i + 1,
+        date: `${workouts[i].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+          workouts[i].dateAdded.day
+        }`,
+      });
+    }
+  }
+
+  if (diets && diets.length > 0) {
+    for (let i = 0; i < diets.length; i++) {
+      dietTotals.push({
+        value: i + 1,
+        date: `${diets[i].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+          diets[i].dateAdded.day
+        }`,
+      });
+    }
+  }
+
+  if (clientCheckins && clientCheckins.length > 0) {
+    for (let i = 0; i < orderedCheckins.length; i++) {
+      checkinTotals.push({
+        value: i + 1,
+        date: `${orderedCheckins[i].date.monthString
+          .slice(0, 3)
+          .toUpperCase()} ${orderedCheckins[i].date.day}`,
+      });
+    }
+  }
+
+  let finalCoach = [];
+  let finalClients = [];
+  let finalDiets = [];
+  let finalConvos = [];
+  let finalWorkouts = [];
+  let finalCheckins = [];
+  let finalUserCheckins = [];
+
+
+  if (coach) {
+    finalCoach = coach.toObject({ getters: true });
+  }
+  if (clients) {
+    finalClients = clients.map((user) => user.toObject({ getters: true }));
+  }
+  if (diets) {
+    finalDiets = diets
+      .reverse()
+      .map((diet) => diet.toObject({ getters: true }));
+  }
+  if (convos) {
+    finalConvos = convos.map((convo) => convo.toObject({ getters: true }));
+  }
+  if (workouts) {
+    finalWorkouts = workouts
+      .reverse()
+      .map((workout) => workout.toObject({ getters: true }));
+  }
+  if (checkins) {
+    finalCheckins = checkins.map((checkin) =>
+      checkin.toObject({ getters: true })
+    );
+  }
+  if (userCheckins) {
+    finalUserCheckins = userCheckins.map((checkin) =>
+      checkin.toObject({ getters: true })
+    );
+  }
+
   ///////////////////////////////////////////////////////////////////////////
 
-
   res.json({
-    coach: coach.toObject({getters: true}),
-
-
-    clients: clients.map((user) => user.toObject({ getters: true })),
-    diets: diets.map((diet) => diet.toObject({ getters: true })),
-    convos: convos.map((convo) => convo.toObject({ getters: true })),
-    workouts: workouts
-      .reverse()
-      .map((workout) => workout.toObject({ getters: true })),
+    code: code,
+    clientTotals: clientTotals,
+    workoutTotals: workoutTotals,
+    dietTotals: dietTotals,
+    checkinTotals: checkinTotals,
+    coach: finalCoach,
+    clients: finalClients,
+    diets: finalDiets,
+    convos: finalConvos,
+    workouts: finalWorkouts,
     user: user.toObject({ getters: true }),
-    checkins: checkins.map((checkin) => checkin.toObject({ getters: true })),
-    //////////////////////////////////////////////////////////////////////////////////
-    userCheckins: userCheckins.map((checkin) => checkin.toObject({ getters: true}))
-    //////////////////////////////////////////////////////////////////////////////
+    name: user.name,
+    age: user.age,
+    gender: user.gender,
+    checkins: finalCheckins,
+    userCheckins: finalUserCheckins,
   });
 };
 
