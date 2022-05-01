@@ -62,7 +62,6 @@ const createCheckin = async (req, res, next) => {
   let workout;
   let diet;
   let dateAdded;
-  let imageUrlArray = [];
 
   //check token matches user
 
@@ -94,37 +93,32 @@ const createCheckin = async (req, res, next) => {
     return next(error);
   }
 
-  const uploadFunction =  async() => {
-    console.log("its running")
+  const uploadFunction = async (uploadedImages) => {
+    let imageUrlArray = [];
+		if (!uploadedImages || uploadedImages.length < 0) {
+      return imageUrlArray;
+		}
+
     let uploadedResponse;
-    images.forEach(item => async() => {
-      try {
-        uploadedResponse = await cloudinary.uploader.upload(item, {
-          upload_preset: 'coach-production',
-        });
-      } catch (err) {
-        const error = new HttpError(
-          'Couldnt upload this image to cloudinary',
-          500
-          );
-          return next(error);
-        }
-        console.log(uploadedResponse.url)
-        imageUrlArray = [...imageUrlArray, uploadedResponse.url];
-        console.log(imageUrlArray)
-      })
+		for (const image of uploadedImages) {
+			try {
+				uploadedResponse = await cloudinary.uploader.upload(image, {
+					upload_preset: 'coach-production',
+				});
+			} catch (err) {
+				const error = new HttpError(
+					'Couldnt upload this image to cloudinary',
+					500
+				);
+				return next(error);
+			}
+			imageUrlArray.push(uploadedResponse.url);
+		}
 
-  }
+    return imageUrlArray;
+  };
 
-  if (images && images.length > 0) {
-    uploadFunction()
-  }
-
-
-
-
-
-  console.log(imageUrlArray)
+  const imageURLs = await uploadFunction(images);
 
   const monthArray = [
     'January',
@@ -366,8 +360,8 @@ const createCheckin = async (req, res, next) => {
     notified: false,
   });
 
-  if (imageUrlArray.length > 0) {
-    createdCheckin.images = imageUrlArray;
+  if (imageURLs.length > 0) {
+    createdCheckin.images = imageURLs;
   }
 
   if (workout) {

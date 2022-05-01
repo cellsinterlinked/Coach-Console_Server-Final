@@ -693,7 +693,6 @@ const getAllUserData = async (req, res, next) => {
     const error = new HttpError('couldnt find the checkins of your clients');
     return next(error);
   }
-  console.log('made it this far');
   let orderedCheckins = clientCheckins.sort(function (a, b) {
     return a.date.time - b.date.time;
   });
