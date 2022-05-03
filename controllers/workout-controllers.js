@@ -83,20 +83,22 @@ const createWorkout = async (req, res, next) => {
   for (let i = 0; i < weightData.length; i++) {
     for (let j = 0; j < weightData[i].data.length; j++) {
       if (weightData[i].data[j].exercise) {
-        volumeTotal = volumeTotal + weightData[i].data[j].sets;
+        volumeTotal = parseInt(volumeTotal) + parseInt(weightData[i].data[j].sets);
       }
     }
   }
 
   let calorieTotal = 0;
   let timeTotal = 0;
-  for (let i = 0; i < cardioData.data.length; i++) {
-    if (cardioData.data[i].time) {
-      calorieTotal = calorieTotal + cardioData.data[i].cals;
+  for (let i = 0; i < cardioData.length; i++) {
+    for (let j = 0; j < cardioData[i].data.length; j++) {
+    if (cardioData[i].data[j].cals) {
+      calorieTotal = parseInt(calorieTotal) + parseInt(cardioData[i].data[j].cals);
     }
-    if (cardioData.data[i].time) {
-      timeTotal = timeTotal + cardioData.data[i].time;
+    if (cardioData[i].data[j].time) {
+      timeTotal = parseInt(timeTotal) + parseInt(cardioData[i].data[j].time);
     }
+  }
   }
 
   const createdWorkout = new Workout({
@@ -176,6 +178,10 @@ const sendWorkout = async (req, res, next) => {
   res.status(200).json({ client: client.toObject({ getters: true }) });
 };
 
+
+
+
+
 const editWorkout = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -219,15 +225,18 @@ const editWorkout = async (req, res, next) => {
     }
   }
 
+
   let calorieTotal = 0;
   let timeTotal = 0;
-  for (let i = 0; i < cardioData.data.length; i++) {
-    if (cardioData.data[i].time) {
-      calorieTotal = calorieTotal + cardioData.data[i].cals;
+  for (let i = 0; i < cardioData.length; i++) {
+    for (let j = 0; j < cardioData[i].data.length; j++) {
+    if (cardioData[i].data[j].cals) {
+      calorieTotal = parseInt(calorieTotal) + parseInt(cardioData[i].data[j].cals);
     }
-    if (cardioData.data[i].time) {
-      timeTotal = timeTotal + cardioData.data[i].time;
+    if (cardioData[i].data[j].time) {
+      timeTotal = parseInt(timeTotal) + parseInt(cardioData[i].data[j].time);
     }
+  }
   }
 
   workout.totalSets = volumeTotal;

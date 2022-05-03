@@ -540,10 +540,11 @@ const deleteCheckin = async (req, res, next) => {
   const checkinId = req.params.cid
 
   let checkin;
+  let user;
 
 
   try {
-    checkin = await Checkin.findById(checkinId).populate('client')
+    checkin = await Checkin.findById(checkinId).populate("client")
   } catch (err) {
     const error = new HttpError(
       'Could not find a checkin with the given id',
@@ -551,6 +552,30 @@ const deleteCheckin = async (req, res, next) => {
       );
       return next(error);
     }
+
+  // try {
+  //   user = await User.findById(checkin.client)
+  // } catch (err) {
+  //   const error = new HttpError(
+  //     'Could not find a client with the given id',
+  //     500
+  //     );
+  //     return next(error);
+  //   }
+
+  //   user.checkins = user.checkins.filter(checkin => checkin.id !== checkinId)
+
+  //   try {
+  //     const sess = await mongoose.startSession();
+  //     sess.startTransaction();
+  //     await checkin.remove({ session: sess });
+  //     await user.save({ session: sess });
+  //     await sess.commitTransaction();
+  //   } catch (err) {
+  //     const error = new HttpError(`Could not delete this checkin ${err}`, 500);
+  //     return next(error);
+  //   }
+
 
 
   try {
