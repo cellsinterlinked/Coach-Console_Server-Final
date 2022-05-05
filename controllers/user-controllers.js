@@ -671,7 +671,7 @@ const getAllUserData = async (req, res, next) => {
     return next(error);
   }
 
-  console.log(clients)
+
   try {
     checkins = await Checkin.find({ client: user.clients });
   } catch (err) {
@@ -687,23 +687,52 @@ const getAllUserData = async (req, res, next) => {
     return next(error);
   }
 
-  try {
-    clientCheckins = await Checkin.find({ coach: userId });
-  } catch (err) {
-    const error = new HttpError('couldnt find the checkins of your clients');
-    return next(error);
-  }
-  let orderedCheckins = clientCheckins.sort(function (a, b) {
+  // try {
+  //   clientCheckins = await Checkin.find({ coach: userId });
+  // } catch (err) {
+  //   const error = new HttpError('couldnt find the checkins of your clients');
+  //   return next(error);
+  // }
+
+  let orderedCheckins
+  let orderedDiets
+  let orderedWorkouts
+  let orderedClients
+
+if (checkins) {
+  orderedCheckins = checkins.sort(function (a, b) {
     return a.date.time - b.date.time;
   });
+}
+
+if (workouts) {
+  orderedWorkouts = workouts.sort(function (a, b) {
+    return a.dateAdded.time - b.dateAdded.time;
+  });
+
+}
+  if (diets) {
+  orderedDiets = diets.sort(function (a, b) {
+      return a.dateAdded.time - b.dateAdded.time;
+    });
+  }
+
+if(clients) {
+   orderedClients = clients.sort(function (a, b) {
+    return a.dateJoined.time - b.dateJoined.time;
+  });
+}
+
+
 
   let clientTotals = [];
   let workoutTotals = [];
   let dietTotals = [];
   let checkinTotals = [];
 // this is just the client id. Need whole client info.
-  if (clients) {
-    for (let i = 0; i < clients.length; i++) {
+if (clients && clients.length > 1) {
+  for (let i = 1; i < orderedClients.length; i++) {
+    if(i === orderedClients.length -1) {
       clientTotals.push({
         value: i + 1,
         date: `${clients[i].dateJoined.monthString.slice(0, 3).toUpperCase()} ${
@@ -711,42 +740,133 @@ const getAllUserData = async (req, res, next) => {
         }`,
       });
     }
-  }
-
-  console.log(workouts);
-
-  if (workouts && workouts.length > 0) {
-    for (let i = 0; i < workouts.length; i++) {
-      workoutTotals.push({
+    if(orderedClients[i - 1].dateJoined.day !==  orderedClients[i].dateJoined.day) {
+      clientTotals.push({
         value: i + 1,
-        date: `${workouts[i].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
-          workouts[i].dateAdded.day
+        date: `${clients[i-1].dateJoined.monthString.slice(0, 3).toUpperCase()} ${
+          clients[i-1].dateJoined.day
         }`,
       });
     }
+
+
+  }
+}
+
+if(clients.length == 1 ) {
+  clientTotals.push({
+    value: 1,
+    date: `${clients[0].dateJoined.monthString.slice(0, 3).toUpperCase()} ${
+      clients[0].dateJoined.day
+    }`,
+  });
+}
+
+
+  if (workouts && workouts.length > 1) {
+    for (let i = 1; i < orderedWorkouts.length; i++) {
+      if(i === orderedWorkouts.length -1) {
+        workoutTotals.push({
+          value: i + 1,
+          date: `${workouts[i].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+            workouts[i].dateAdded.day
+          }`,
+        });
+      }
+      if(orderedWorkouts[i - 1].dateAdded.day !==  orderedWorkouts[i].dateAdded.day) {
+        workoutTotals.push({
+          value: i + 1,
+          date: `${workouts[i-1].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+            workouts[i-1].dateAdded.day
+          }`,
+        });
+      }
+
+
+    }
+  }
+
+  if(workouts.length == 1 ) {
+    workoutTotals.push({
+      value: 1,
+      date: `${workouts[0].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+        workouts[0].dateAdded.day
+      }`,
+    });
   }
 
   if (diets && diets.length > 0) {
-    for (let i = 0; i < diets.length; i++) {
-      dietTotals.push({
-        value: i + 1,
-        date: `${diets[i].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
-          diets[i].dateAdded.day
-        }`,
-      });
+    for (let i = 1; i < orderedDiets.length; i++) {
+      if(i === orderedDiets.length -1) {
+        dietTotals.push({
+          value: i + 1,
+          date: `${diets[i].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+            diets[i].dateAdded.day
+          }`,
+        });
+      }
+      if(orderedDiets[i - 1].dateAdded.day !==  orderedDiets[i].dateAdded.day) {
+        dietTotals.push({
+          value: i + 1,
+          date: `${diets[i-1].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+            diets[i-1].dateAdded.day
+          }`,
+        });
+      }
+
+
     }
   }
 
-  if (clientCheckins && clientCheckins.length > 0) {
-    for (let i = 0; i < orderedCheckins.length; i++) {
+  if(diets.length == 1 ) {
+    dietTotals.push({
+      value: 1,
+      date: `${diets[0].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+        diets[0].dateAdded.day
+      }`,
+    });
+  }
+
+
+
+
+
+  if (orderedCheckins && orderedCheckins.length > 0) {
+    for (let i = 1; i < orderedCheckins.length; i++) {
+      if (i === orderedCheckins.length - 1) {
       checkinTotals.push({
         value: i + 1,
         date: `${orderedCheckins[i].date.monthString
           .slice(0, 3)
           .toUpperCase()} ${orderedCheckins[i].date.day}`,
-      });
+      })
+    }
+      if(orderedCheckins[i - 1].date.day !==  orderedCheckins[i].date.day) {
+        checkinTotals.push({
+          value: i + 1,
+          date: `${orderedCheckins[i - 1].date.monthString
+            .slice(0, 3)
+            .toUpperCase()} ${orderedCheckins[i - 1].date.day}`,
+        });
+
+      }
+
     }
   }
+
+  if(checkins.length == 1 ) {
+    checkinTotals.push({
+      value: 1,
+      date: `${checkins[0].date.monthString.slice(0, 3).toUpperCase()} ${
+        checkins[0].date.day
+      }`,
+    });
+  }
+
+  //filter this array to only have one value (the largest) for each date ^
+
+
+
 
   let finalCoach = [];
   let finalClients = [];
@@ -790,6 +910,7 @@ const getAllUserData = async (req, res, next) => {
   ///////////////////////////////////////////////////////////////////////////
 
   res.json({
+
     code: code,
     clientTotals: clientTotals,
     workoutTotals: workoutTotals,

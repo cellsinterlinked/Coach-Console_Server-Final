@@ -242,16 +242,16 @@ const editDiet = async (req, res, next) => {
     let carbTotal = 0;
     for (let j = 0; j < food[i].data.length; j++) {
       if (food[i].data[j].cals) {
-        calorieTotal = calorieTotal + food[i].data[j].cals;
+        calorieTotal = calorieTotal + parseInt(food[i].data[j].cals);
       }
       if (food[i].data[j].fat) {
-        fatTotal = fatTotal + food[i].data[j].fat;
+        fatTotal = fatTotal + parseInt(food[i].data[j].fat);
       }
       if (food[i].data[j].carb) {
-        carbTotal = carbTotal + food[i].data[j].carb;
+        carbTotal = carbTotal + parseInt(food[i].data[j].carb);
       }
       if (food[i].data[j].pro) {
-        proteinTotal = proteinTotal + food[i].data[j].pro;
+        proteinTotal = proteinTotal + parseInt(food[i].data[j].pro);
       }
     }
     food[i].totalCals = calorieTotal;
@@ -328,6 +328,15 @@ const sendDiet = async(req, res, next) => {
   const { userId, clientId, dietId } = req.body;
   let client;
   let diet;
+  let user;
+
+
+  try {
+    user = await User.findById(userId)
+  } catch (err) {
+    const error = new HttpError('Couldnt find that user', 500);
+    return next(error);
+  }
 
   try {
     client = await User.findById(clientId);
@@ -339,9 +348,24 @@ const sendDiet = async(req, res, next) => {
   try {
     diet = await Diet.findById(dietId);
   } catch (err) {
-    const error = new HttpError('Couldnt find that workout', 500);
+    const error = new HttpError('Couldnt find that diet', 500);
     return next(error);
   }
+  if (client.diets.includes(diet.id)) {
+    const error = new HttpError('Looks like they already have this diet! ', 500);
+    return next(error);
+  }
+
+  if (user.role === 'client' && client.clients.includes(user.id) === false) {
+    const error = new HttpError('Cannot share a diet if you arent their client or coach! ', 500);
+    return next(error);
+  }
+
+  if (user.role === 'coach' && client.coach.includes(user.id) === false) {
+    const error = new HttpError('Cannot share a diet if you arent their client or coach! ', 500);
+    return next(error);
+  }
+
 
   //check if coach is the id of the token
 

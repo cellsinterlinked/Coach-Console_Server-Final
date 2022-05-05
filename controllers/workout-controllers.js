@@ -220,7 +220,7 @@ const editWorkout = async (req, res, next) => {
   for (let i = 0; i < weightData.length; i++) {
     for (let j = 0; j < weightData[i].data.length; j++) {
       if (weightData[i].data[j].exercise) {
-        volumeTotal = volumeTotal + weightData[i].data[j].sets;
+        volumeTotal = volumeTotal + parseInt(weightData[i].data[j].sets);
       }
     }
   }
