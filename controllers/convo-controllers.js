@@ -13,7 +13,7 @@ const cloudinary = require('cloudinary').v2;
 const getConvos = async (req, res, next) => {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError('Invalid inputs passed. Make sure all inputs have been filled out.', 422)
       )
@@ -59,7 +59,7 @@ const getConvos = async (req, res, next) => {
 
 
 
-  console.log(role, userId, convos)
+
 
   if (!convos) {
     const error = new HttpError('No convos with this user id', 500)
@@ -76,7 +76,7 @@ const getConvos = async (req, res, next) => {
 const updateAddConvo = async (req, res, next) => {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError('Invalid inputs passed. Make sure all inputs have been filled out.', 422)
       )
@@ -86,11 +86,27 @@ const updateAddConvo = async (req, res, next) => {
 // deal with cloudinary image later
 
   let convo;
+  let coach;
+  let client
 
   try {
     convo = await Convo.findById(convoId)
   } catch(err) {
     const error = new HttpError('Something went wrong, cant find this convo', 500)
+    return next(error);
+  }
+
+  try {
+    coach = await User.findById(convo.coach)
+  }catch(err) {
+    const error = new HttpError('Something went wrong, cant find this user', 500)
+    return next(error);
+  }
+
+  try {
+    client = await User.findById(convo.client)
+  }catch(err) {
+    const error = new HttpError('Something went wrong, cant find this user', 500)
     return next(error);
   }
 
@@ -102,7 +118,7 @@ const updateAddConvo = async (req, res, next) => {
       uploadedResponse = await cloudinary.uploader.upload(image, {
         upload_preset: 'coach-production',
       });
-      console.log(uploadedResponse);
+
     } catch (err) {
       const error = new HttpError(
         'Couldnt upload this image to cloudinary',
@@ -128,10 +144,24 @@ const stringMonth = monthArray[month - 1]
 convo.messages= [...convo.messages, {message: message, user: userId, date: {fullDate: today, month: month, day: day, year: year, time:codeTime, monthString: stringMonth}, image: imageUrl }]
 if (role === 'client') {
   convo.coachNotifications = convo.coachNotifications + 1
+  coach.notifications = {
+    clients: [...coach.notifications.clients],
+    workouts: [...coach.notifications.workouts],
+    diets: [...coach.notifications.diets],
+    messages: [...coach.notifications.messages, convo.id],
+    checkins: [...coach.notifications.checkins]
+  }
 }
 
 if (role === 'coach') {
   convo.clientNotifications = convo.clientNotifications + 1
+  client.notifications = {
+    clients: [...client.notifications.clients],
+    workouts: [...client.notifications.workouts],
+    diets: [...client.notifications.diets],
+    messages: [...client.notifications.messages, convo.id],
+    checkins: [...client.notifications.checkins]
+  }
 }
 
 try {
@@ -141,7 +171,43 @@ try {
   return next(error)
 }
 
-res.status(200).json({convo: convo.toObject({ getters: true})})
+try {
+  await coach.save();
+} catch(err) {
+  const error = new HttpError('sending this message did not work.', 500)
+  return next(error)
+}
+
+try {
+  await client.save();
+} catch(err) {
+  const error = new HttpError('sending this message did not work.', 500)
+  return next(error)
+}
+let convos;
+if (role ==='client') {
+  try {
+    convos = await Convo.find({ client: userId})
+  } catch (err) {
+    const error = new HttpError('Could not fetch convos', 500)
+    return next(error)
+  }
+
+}
+
+if (role ==='coach') {
+  try {
+    convos = await Convo.find({ coach: userId})
+  } catch (err) {
+    const error = new HttpError('Could not fetch convos', 500)
+    return next(error)
+  }
+
+}
+
+
+
+res.status(200).json({convo: convo.toObject({ getters: true}), convos: convos.map(c => c.toObject({ getters: true }))})
 
 }
 
@@ -155,7 +221,7 @@ res.status(200).json({convo: convo.toObject({ getters: true})})
 const updateDeleteConvo = async (req, res, next) => {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError('Invalid inputs passed. Make sure all inputs have been filled out.', 422)
       )
@@ -197,7 +263,7 @@ const updateDeleteConvo = async (req, res, next) => {
 const updateConvoNotifications = async (req, res, next) => {
   const errors = validationResult(req)
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError('Invalid inputs passed. Make sure all inputs have been filled out.', 422)
       )

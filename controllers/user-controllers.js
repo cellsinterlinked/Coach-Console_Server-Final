@@ -15,7 +15,7 @@ const Str = require('@supercharge/strings');
 const createUser = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -136,9 +136,16 @@ const createUser = async (req, res, next) => {
     age: 0,
     dateJoined: dateJoined,
     code: code,
+    notifications: {
+      clients: [],
+      workouts: [],
+      diets: [],
+      messages: [],
+      checkins: []
+    }
   });
 
-  console.log(createdUser);
+
 
   try {
     await createdUser.save();
@@ -150,10 +157,13 @@ const createUser = async (req, res, next) => {
   let token;
   try {
     token = jwt.sign(
-      { userId: createdUser.id, email: createdUser.email },
+      { userId: createdUser.id,
+        email: createdUser.email,
+        role: createdUser.role },
       'supersecret_dont-share',
       { expiresIn: '1h' }
     );
+
   } catch (err) {
     const error = new HttpError('Creating user failed 2 ', 500);
     return next(error);
@@ -177,7 +187,24 @@ const createUser = async (req, res, next) => {
 
     codedUser.clients.push(createdUser.id);
     codedUser.conversations.push(createdConvo.id);
+    codedUser.notifications = {
+      clients: [...codedUser.notifications.clients, createdUser.id],
+      workouts: [...codedUser.notifications.workouts],
+      diets: [...codedUser.notifications.diets],
+      messages: [...codedUser.notifications.messages],
+      checkins: [...codedUser.notifications.checkins]
+    }
     createdUser.conversations.push(createdConvo.id);
+
+
+
+
+    try {
+      createdUser.save();
+    } catch (err) {
+      const error = new HttpError('could not update the client', 500);
+      return next(error);
+    }
 
     try {
       codedUser.save();
@@ -187,9 +214,17 @@ const createUser = async (req, res, next) => {
     }
 
     try {
-      createdUser.save();
+      token = jwt.sign(
+        { userId: createdUser.id,
+          email: createdUser.email,
+          role: createdUser.role
+        },
+        'supersecret_dont-share',
+        { expiresIn: '1h' }
+      );
+
     } catch (err) {
-      const error = new HttpError('could not update the client', 500);
+      const error = new HttpError('Creating user failed 2 ', 500);
       return next(error);
     }
 
@@ -199,6 +234,7 @@ const createUser = async (req, res, next) => {
   res.status(201).json({
     userId: createdUser.id,
     email: createdUser.email,
+    role: createdUser.role,
     token: token,
     userName: createdUser.userName,
   });
@@ -211,7 +247,7 @@ const createUser = async (req, res, next) => {
 const login = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -278,10 +314,133 @@ const login = async (req, res, next) => {
   });
 };
 
+const tempUpdate = async (req, res, next) => {
+  const userId = req.params.uid
+
+  let user;
+  try {
+  user = await User.findById(userId)
+  } catch (err) {
+    const error = new HttpError(
+      'Something went wrong, could not find this user',
+      500
+    );
+    return next(error);
+  }
+
+  user.notifications = {
+    clients: [],
+    workouts: [],
+    diets: [],
+    messages: [],
+    checkins: []
+  }
+
+  try {
+  await user.save();
+} catch (err) {
+  const error = new HttpError(`Could not update user ${err}`, 500);
+  return next(error);
+}
+res.status(200).json({ user: user.toObject({ getters: true }) });
+}
+
+
+
+
+
+const updateNotifications = async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+
+    return next(
+      new HttpError(
+        'Invalid inputs passed. Make sure all inputs have been filled out.',
+        422
+      )
+    );
+  }
+const userId = req.params.uid
+const {workout, diet, client, message, checkin} = req.body
+
+let user;
+try {
+  user = await User.findById(userId)
+} catch (err) {
+  const error = new HttpError(
+    'Something went wrong, could not find this user',
+    500
+  );
+  return next(error);
+}
+
+
+if (workout) {
+  user.notifications = {
+    clients: [...user.notifications.clients],
+    workouts: user.notifications.workouts.filter(item => item !== workout),
+    diets: [...user.notifications.diets],
+    messages: [...user.notifications.messages],
+    checkins: [...user.notifications.checkins]
+  }
+
+}
+if (diet) {
+  user.notifications = {
+    clients: [...user.notifications.clients],
+    workouts: [...user.notifications.workouts],
+    diets: user.notifications.diets.filter(item => item !== diet),
+    messages: [...user.notifications.messages],
+    checkins: [...user.notifications.checkins]
+  }
+}
+if (client) {
+  user.notifications = {
+    clients: user.notifications.clients.filter(item => item !== client),
+    workouts: [...user.notifications.workouts],
+    diets: [...user.notifications.diets],
+    messages: [...user.notifications.messages],
+    checkins: [...user.notifications.checkins]
+  }
+}
+
+if (message) {
+  user.notifications = {
+    clients: [...user.notifications.clients],
+    workouts: [...user.notifications.workouts],
+    diets: [...user.notifications.diets],
+    messages: user.notifications.messages.filter(item => item !== message),
+    checkins: [...user.notifications.checkins]
+  }
+}
+if (checkin) {
+  user.notifications = {
+    clients: [...user.notifications.clients],
+    workouts: [...user.notifications.workouts],
+    diets: [...user.notifications.diets],
+    messages: [...user.notifications.messages],
+    checkins: user.notifications.checkins.filter(item => item !== checkin)
+  }
+}
+
+try {
+  await user.save();
+} catch (err) {
+  const error = new HttpError(`Could not update user ${err}`, 500);
+  return next(error);
+}
+res.status(200).json({ user: user.toObject({ getters: true }) });
+}
+
+
+
+
+
+
 const updateUser = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -311,7 +470,7 @@ const updateUser = async (req, res, next) => {
       uploadedResponse = await cloudinary.uploader.upload(image, {
         upload_preset: 'coach-production',
       });
-      console.log(uploadedResponse);
+
     } catch (err) {
       const error = new HttpError(
         'Couldnt upload this image to cloudinary',
@@ -337,20 +496,7 @@ const updateUser = async (req, res, next) => {
   }
   user.checkins = [];
 
-  // if (image) {
-  //   try {
-  //     cloudinary.uploader.add_tag(userId, newPublicId, function(error,result) {
-  //       console.log(`this is result ${result}, and this is error ${error}`) });
 
-  //   } catch(err) {
-  //    const error = new HttpError('Cloudinary hates you', 500)
-  //    return next(error)
-
-  //   }
-
-  //  potentially do all cloudinary on back end?
-
-  // need to check token to see if it belongs to this user!
 
   try {
     await user.save();
@@ -413,8 +559,7 @@ const getClients = async (req, res, next) => {
 const addClient = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    // if there are errors
-    console.log(errors);
+
     return next(
       new HttpError('Is this a real person? Is this the matrix?', 422)
     );
@@ -499,8 +644,7 @@ const addClient = async (req, res, next) => {
 const removeClient = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    // if there are errors
-    console.log(errors);
+
     return next(
       new HttpError('Is this a real person? Is this the matrix?', 422)
     );
@@ -604,8 +748,7 @@ const removeClient = async (req, res, next) => {
 const getAllUserData = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    // if there are errors
-    console.log(errors);
+
     return next(
       new HttpError('Is this a real person? Is this the matrix?', 422)
     );
@@ -671,7 +814,7 @@ const getAllUserData = async (req, res, next) => {
     return next(error);
   }
 
-  console.log(clients)
+
   try {
     checkins = await Checkin.find({ client: user.clients });
   } catch (err) {
@@ -713,7 +856,7 @@ const getAllUserData = async (req, res, next) => {
     }
   }
 
-  console.log(workouts);
+
 
   if (workouts && workouts.length > 0) {
     for (let i = 0; i < workouts.length; i++) {
@@ -806,6 +949,7 @@ const getAllUserData = async (req, res, next) => {
     gender: user.gender,
     checkins: finalCheckins,
     userCheckins: finalUserCheckins,
+    notifications: user.notifications
   });
 };
 
@@ -817,3 +961,6 @@ exports.getAllUsers = getAllUsers;
 exports.updateUser = updateUser;
 exports.login = login;
 exports.createUser = createUser;
+exports.updateNotifications = updateNotifications
+
+exports.tempUpdate = tempUpdate;

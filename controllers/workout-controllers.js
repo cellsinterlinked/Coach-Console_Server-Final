@@ -11,7 +11,7 @@ const { default: mongoose } = require('mongoose');
 const createWorkout = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -39,11 +39,11 @@ const createWorkout = async (req, res, next) => {
     return next(error);
   }
 
-  console.log(workouts)
+
 
   let nameArr = workouts.filter(e => e.name === name)
 
-  console.log(nameArr)
+
 
   if (nameArr === []) {
     const error = new HttpError('This is already the name of a workout')
@@ -165,6 +165,15 @@ const sendWorkout = async (req, res, next) => {
 
   client.workouts = [...client.workouts, workout.id];
 
+  client.notifications = {
+    clients: [...client.notifications.clients],
+    workouts: [...client.notifications.workouts, workoutId],
+    diets: [...client.notifications.diets],
+    messages: [...client.notifications.messages],
+    checkins: [...client.notifications.checkins]
+  }
+
+
   try {
     await client.save();
   } catch (err) {
@@ -185,7 +194,7 @@ const sendWorkout = async (req, res, next) => {
 const editWorkout = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
