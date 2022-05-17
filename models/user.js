@@ -19,7 +19,8 @@ gender:{type: Number, required: false},
 age: {type: Number, required: false},
 checkins:[{type: mongoose.Types.ObjectId, required: true, ref: 'Checkin'}],
 dateJoined: {type: Object, required: true},
-code: {type: String, required: true}
+code: {type: String, required: true},
+notifications: {type: Object, required: true}
 })
 
 

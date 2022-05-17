@@ -1,7 +1,10 @@
 const express = require('express')
 const dietControllers = require('../controllers/diet-controllers');
+const checkAuth = require('../middleware/check-auth')
 
 const router = express.Router();
+
+router.use(checkAuth)
 
 router.get('/:uid', dietControllers.getDiets);
 

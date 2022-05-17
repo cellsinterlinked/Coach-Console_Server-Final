@@ -15,7 +15,6 @@ const Str = require('@supercharge/strings');
 const createUser = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -47,11 +46,11 @@ const createUser = async (req, res, next) => {
 
   // if role is client
   let codedUser;
-  let coachId = []
+  let coachId = [];
 
   if (role === 'client' && coachCode) {
     try {
-      codedUser = await User.findOne({code: coachCode})
+      codedUser = await User.findOne({ code: coachCode });
     } catch (err) {
       const error = newHttpError('Couldnt find a coach with this code', 500);
       return next(error);
@@ -63,21 +62,9 @@ const createUser = async (req, res, next) => {
       );
       return next(error);
     } else {
-      coachId = codedUser.id
+      coachId = codedUser.id;
     }
-
-
   }
-
-
-
-
-
-
-
-
-
-
 
   let hashedPassword;
   try {
@@ -86,8 +73,6 @@ const createUser = async (req, res, next) => {
     const error = new HttpError('creashed while creating hashed password', 500);
     return next(error);
   }
-
-
 
   const monthArray = [
     'January',
@@ -136,9 +121,14 @@ const createUser = async (req, res, next) => {
     age: 0,
     dateJoined: dateJoined,
     code: code,
+    notifications: {
+      clients: [],
+      workouts: [],
+      diets: [],
+      messages: [],
+      checkins: [],
+    },
   });
-
-  console.log(createdUser);
 
   try {
     await createdUser.save();
@@ -150,7 +140,11 @@ const createUser = async (req, res, next) => {
   let token;
   try {
     token = jwt.sign(
-      { userId: createdUser.id, email: createdUser.email },
+      {
+        userId: createdUser.id,
+        email: createdUser.email,
+        role: createdUser.role,
+      },
       'supersecret_dont-share',
       { expiresIn: '1h' }
     );
@@ -165,8 +159,8 @@ const createUser = async (req, res, next) => {
       client: createdUser.id,
       messages: [],
       clientNotifications: 0,
-      coachNotifications: 0
-    })
+      coachNotifications: 0,
+    });
 
     try {
       await createdConvo.save();
@@ -177,14 +171,14 @@ const createUser = async (req, res, next) => {
 
     codedUser.clients.push(createdUser.id);
     codedUser.conversations.push(createdConvo.id);
+    codedUser.notifications = {
+      clients: [...codedUser.notifications.clients, createdUser.id],
+      workouts: [...codedUser.notifications.workouts],
+      diets: [...codedUser.notifications.diets],
+      messages: [...codedUser.notifications.messages],
+      checkins: [...codedUser.notifications.checkins],
+    };
     createdUser.conversations.push(createdConvo.id);
-
-    try {
-      codedUser.save();
-    } catch (err) {
-      const error = new HttpError('could not update coach list of clients', 500);
-      return next(error);
-    }
 
     try {
       createdUser.save();
@@ -193,25 +187,44 @@ const createUser = async (req, res, next) => {
       return next(error);
     }
 
-  }
+    try {
+      codedUser.save();
+    } catch (err) {
+      const error = new HttpError(
+        'could not update coach list of clients',
+        500
+      );
+      return next(error);
+    }
 
+    try {
+      token = jwt.sign(
+        {
+          userId: createdUser.id,
+          email: createdUser.email,
+          role: createdUser.role,
+        },
+        'supersecret_dont_share',
+        { expiresIn: '1h' }
+      );
+    } catch (err) {
+      const error = new HttpError('Creating user failed 2 ', 500);
+      return next(error);
+    }
+  }
 
   res.status(201).json({
     userId: createdUser.id,
     email: createdUser.email,
+    role: createdUser.role,
     token: token,
     userName: createdUser.userName,
   });
 };
 
-
-
-
-
 const login = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -278,10 +291,120 @@ const login = async (req, res, next) => {
   });
 };
 
+const tempUpdate = async (req, res, next) => {
+  const userId = req.params.uid;
+
+  let user;
+  try {
+    user = await User.findById(userId);
+  } catch (err) {
+    const error = new HttpError(
+      'Something went wrong, could not find this user',
+      500
+    );
+    return next(error);
+  }
+
+  user.notifications = {
+    clients: [],
+    workouts: [],
+    diets: [],
+    messages: [],
+    checkins: [],
+  };
+
+  try {
+    await user.save();
+  } catch (err) {
+    const error = new HttpError(`Could not update user ${err}`, 500);
+    return next(error);
+  }
+  res.status(200).json({ user: user.toObject({ getters: true }) });
+};
+
+const updateNotifications = async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return next(
+      new HttpError(
+        'Invalid inputs passed. Make sure all inputs have been filled out.',
+        422
+      )
+    );
+  }
+  const userId = req.params.uid;
+  const { workout, diet, client, message, checkin } = req.body;
+
+  let user;
+  try {
+    user = await User.findById(userId);
+  } catch (err) {
+    const error = new HttpError(
+      'Something went wrong, could not find this user',
+      500
+    );
+    return next(error);
+  }
+
+  if (workout) {
+    user.notifications = {
+      clients: [...user.notifications.clients],
+      workouts: user.notifications.workouts.filter((item) => item !== workout),
+      diets: [...user.notifications.diets],
+      messages: [...user.notifications.messages],
+      checkins: [...user.notifications.checkins],
+    };
+  }
+  if (diet) {
+    user.notifications = {
+      clients: [...user.notifications.clients],
+      workouts: [...user.notifications.workouts],
+      diets: user.notifications.diets.filter((item) => item !== diet),
+      messages: [...user.notifications.messages],
+      checkins: [...user.notifications.checkins],
+    };
+  }
+  if (client) {
+    user.notifications = {
+      clients: user.notifications.clients.filter((item) => item !== client),
+      workouts: [...user.notifications.workouts],
+      diets: [...user.notifications.diets],
+      messages: [...user.notifications.messages],
+      checkins: [...user.notifications.checkins],
+    };
+  }
+
+  if (message) {
+    user.notifications = {
+      clients: [...user.notifications.clients],
+      workouts: [...user.notifications.workouts],
+      diets: [...user.notifications.diets],
+      messages: user.notifications.messages.filter((item) => item !== message),
+      checkins: [...user.notifications.checkins],
+    };
+  }
+  if (checkin) {
+    user.notifications = {
+      clients: [...user.notifications.clients],
+      workouts: [...user.notifications.workouts],
+      diets: [...user.notifications.diets],
+      messages: [...user.notifications.messages],
+      checkins: user.notifications.checkins.filter((item) => item !== checkin),
+    };
+  }
+
+  try {
+    await user.save();
+  } catch (err) {
+    const error = new HttpError(`Could not update user ${err}`, 500);
+    return next(error);
+  }
+  res.status(200).json({ user: user.toObject({ getters: true }) });
+};
+
 const updateUser = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -311,7 +434,6 @@ const updateUser = async (req, res, next) => {
       uploadedResponse = await cloudinary.uploader.upload(image, {
         upload_preset: 'coach-production',
       });
-      console.log(uploadedResponse);
     } catch (err) {
       const error = new HttpError(
         'Couldnt upload this image to cloudinary',
@@ -336,21 +458,6 @@ const updateUser = async (req, res, next) => {
     user.gender = gender;
   }
   user.checkins = [];
-
-  // if (image) {
-  //   try {
-  //     cloudinary.uploader.add_tag(userId, newPublicId, function(error,result) {
-  //       console.log(`this is result ${result}, and this is error ${error}`) });
-
-  //   } catch(err) {
-  //    const error = new HttpError('Cloudinary hates you', 500)
-  //    return next(error)
-
-  //   }
-
-  //  potentially do all cloudinary on back end?
-
-  // need to check token to see if it belongs to this user!
 
   try {
     await user.save();
@@ -413,8 +520,6 @@ const getClients = async (req, res, next) => {
 const addClient = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    // if there are errors
-    console.log(errors);
     return next(
       new HttpError('Is this a real person? Is this the matrix?', 422)
     );
@@ -499,8 +604,6 @@ const addClient = async (req, res, next) => {
 const removeClient = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    // if there are errors
-    console.log(errors);
     return next(
       new HttpError('Is this a real person? Is this the matrix?', 422)
     );
@@ -596,16 +699,9 @@ const removeClient = async (req, res, next) => {
   });
 };
 
-
-
-
-
-
 const getAllUserData = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    // if there are errors
-    console.log(errors);
     return next(
       new HttpError('Is this a real person? Is this the matrix?', 422)
     );
@@ -671,7 +767,6 @@ const getAllUserData = async (req, res, next) => {
     return next(error);
   }
 
-
   try {
     checkins = await Checkin.find({ client: user.clients });
   } catch (err) {
@@ -687,11 +782,63 @@ const getAllUserData = async (req, res, next) => {
     return next(error);
   }
 
-  // try {
-  //   clientCheckins = await Checkin.find({ coach: userId });
-  // } catch (err) {
-  //   const error = new HttpError('couldnt find the checkins of your clients');
-  //   return next(error);
+  try {
+    clientCheckins = await Checkin.find({ coach: userId });
+  } catch (err) {
+    const error = new HttpError('couldnt find the checkins of your clients');
+    return next(error);
+  }
+  // let orderedCheckins = clientCheckins.sort(function (a, b) {
+  //   return a.date.time - b.date.time;
+  // });
+
+  // let clientTotals = [];
+  // let workoutTotals = [];
+  // let dietTotals = [];
+  // let checkinTotals = [];
+  // // this is just the client id. Need whole client info.
+  // if (clients) {
+  //   for (let i = 0; i < clients.length; i++) {
+  //     clientTotals.push({
+  //       value: i + 1,
+  //       date: `${clients[i].dateJoined.monthString.slice(0, 3).toUpperCase()} ${
+  //         clients[i].dateJoined.day
+  //       }`,
+  //     });
+  //   }
+  // }
+
+  // if (workouts && workouts.length > 0) {
+  //   for (let i = 0; i < workouts.length; i++) {
+  //     workoutTotals.push({
+  //       value: i + 1,
+  //       date: `${workouts[i].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+  //         workouts[i].dateAdded.day
+  //       }`,
+  //     });
+  //   }
+  // }
+
+  // if (diets && diets.length > 0) {
+  //   for (let i = 0; i < diets.length; i++) {
+  //     dietTotals.push({
+  //       value: i + 1,
+  //       date: `${diets[i].dateAdded.monthString.slice(0, 3).toUpperCase()} ${
+  //         diets[i].dateAdded.day
+  //       }`,
+  //     });
+  //   }
+  // }
+
+  // if (clientCheckins && clientCheckins.length > 0) {
+  //   for (let i = 0; i < orderedCheckins.length; i++) {
+  //     checkinTotals.push({
+  //       value: i + 1,
+  //       date: `${orderedCheckins[i].date.monthString
+  //         .slice(0, 3)
+  //         .toUpperCase()} ${orderedCheckins[i].date.day}`,
+  //     });
+  //   }
   // }
 
   let orderedCheckins
@@ -713,7 +860,7 @@ if (workouts) {
 }
   if (diets) {
   orderedDiets = diets.sort(function (a, b) {
-      return a.dateAdded.time - b.dateAdded.time;
+      return b.dateAdded.time - a.dateAdded.time;
     });
   }
 
@@ -722,7 +869,6 @@ if(clients) {
     return a.dateJoined.time - b.dateJoined.time;
   });
 }
-
 
 
   let clientTotals = [];
@@ -866,8 +1012,6 @@ if(clients.length == 1 ) {
   //filter this array to only have one value (the largest) for each date ^
 
 
-
-
   let finalCoach = [];
   let finalClients = [];
   let finalDiets = [];
@@ -875,7 +1019,6 @@ if(clients.length == 1 ) {
   let finalWorkouts = [];
   let finalCheckins = [];
   let finalUserCheckins = [];
-
 
   if (coach) {
     finalCoach = coach.toObject({ getters: true });
@@ -927,6 +1070,7 @@ if(clients.length == 1 ) {
     gender: user.gender,
     checkins: finalCheckins,
     userCheckins: finalUserCheckins,
+    notifications: user.notifications,
   });
 };
 
@@ -938,3 +1082,6 @@ exports.getAllUsers = getAllUsers;
 exports.updateUser = updateUser;
 exports.login = login;
 exports.createUser = createUser;
+exports.updateNotifications = updateNotifications;
+
+exports.tempUpdate = tempUpdate;

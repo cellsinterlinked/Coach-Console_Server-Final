@@ -15,7 +15,7 @@ const { cloudinary } = require('../utils/cloudinary');
 const createCheckin = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -55,6 +55,7 @@ const createCheckin = async (req, res, next) => {
     notes,
     workoutId,
     dietId,
+    role,
   } = req.body;
 
   let client;
@@ -518,11 +519,41 @@ const createCheckin = async (req, res, next) => {
 
   client.checkins = [...client.checkins, createdCheckin.id];
 
+  if (role === 'client') {
+    coach.notifications = {
+      clients: [...coach.notifications.clients],
+      workouts: [...coach.notifications.workouts],
+      diets: [...coach.notifications.diets],
+      messages: [...coach.notifications.messages],
+      checkins: [...coach.notifications.checkins, createdCheckin.id]
+    }
+  }
+
+  if (role === 'coach') {
+    client.notifications = {
+      clients: [...client.notifications.clients],
+      workouts: [...client.notifications.workouts],
+      diets: [...client.notifications.diets],
+      messages: [...client.notifications.messages],
+      checkins: [...client.notifications.checkins, createdCheckin.id]
+    }
+  }
+
   try {
     await client.save();
   } catch (err) {
     const error = new HttpError(
       `error saving client. here is the error ${err}.`,
+      500
+    );
+    return next(error);
+  }
+
+  try {
+    await coach.save();
+  } catch (err) {
+    const error = new HttpError(
+      `error saving coach. here is the error ${err}.`,
       500
     );
     return next(error);

@@ -1,10 +1,13 @@
 const express = require('express');
+const checkAuth = require('../middleware/check-auth');
 
 const router = express.Router();
 
 const convoControllers = require('../controllers/convo-controllers');
 
 const { check } = require('express-validator');
+
+// router.use(checkAuth)
 
 router.get(
   '/:uid',

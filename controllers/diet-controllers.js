@@ -12,7 +12,7 @@ const { default: mongoose } = require('mongoose');
 const createDiet = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -71,16 +71,16 @@ const createDiet = async (req, res, next) => {
     let carbTotal = 0;
     for (let j = 0; j < food[i].data.length; j++) {
       if (food[i].data[j].cals) {
-        calorieTotal = calorieTotal + food[i].data[j].cals;
+        calorieTotal = calorieTotal + parseInt(food[i].data[j].cals);
       }
       if (food[i].data[j].fat) {
-        fatTotal = fatTotal + food[i].data[j].fat;
+        fatTotal = fatTotal + parseInt(food[i].data[j].fat);
       }
       if (food[i].data[j].carb) {
-        carbTotal = carbTotal + food[i].data[j].carb;
+        carbTotal = carbTotal + parseInt(food[i].data[j].carb);
       }
       if (food[i].data[j].pro) {
-        proteinTotal = proteinTotal + food[i].data[j].pro;
+        proteinTotal = proteinTotal + parseInt(food[i].data[j].pro);
       }
     }
     food[i].totalCals = calorieTotal;
@@ -118,16 +118,16 @@ const createDiet = async (req, res, next) => {
   if (type === 'single') {
     for (let i = 0; i < 7; i++) {
       weeklyCals.push(food[0].totalCals);
-      totalCals = totalCals + food[0].totalCals;
+      totalCals = totalCals + parseInt(food[0].totalCals);
 
       weeklyPro.push(food[0].totalPro);
-      totalPro = totalPro + food[0].totalPro;
+      totalPro = totalPro + parseInt(food[0].totalPro);
 
       weeklyFat.push(food[0].totalFat);
-      totalFat = totalFat + food[0].totalFat;
+      totalFat = totalFat +parseInt(food[0].totalFat);
 
       weeklyCarb.push(food[0].totalCarb);
-      totalCarb = totalCarb + food[0].totalCarb;
+      totalCarb = totalCarb + parseInt(food[0].totalCarb);
     }
   }
 
@@ -200,7 +200,7 @@ const getDiets = async (req, res, next) => {
 const editDiet = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    console.log(errors);
+
     return next(
       new HttpError(
         'Invalid inputs passed. Make sure all inputs have been filled out.',
@@ -273,32 +273,32 @@ const editDiet = async (req, res, next) => {
   if (type === 'multi') {
     for (let i = 0; i < food.length; i++) {
       weeklyCals.push(food[i].totalCals);
-      totalCals = totalCals + food[i].totalCals;
+      totalCals = totalCals + parseInt(food[i].totalCals);
 
       weeklyPro.push(food[i].totalPro);
-      totalPro = totalPro + food[i].totalPro;
+      totalPro = totalPro + parseInt(food[i].totalPro);
 
       weeklyFat.push(food[i].totalFat);
-      totalFat = totalFat + food[i].totalFat;
+      totalFat = totalFat + parseInt(food[i].totalFat);
 
       weeklyCarb.push(food[i].totalCarb);
-      totalCarb = totalCarb + food[i].totalCarb;
+      totalCarb = totalCarb + parseInt(food[i].totalCarb);
     }
   }
 
   if (type === 'single') {
     for (let i = 0; i < 7; i++) {
       weeklyCals.push(food[0].totalCals);
-      totalCals = totalCals + food[0].totalCals;
+      totalCals = totalCals + parseInt(food[0].totalCals);
 
       weeklyPro.push(food[0].totalPro);
-      totalPro = totalPro + food[0].totalPro;
+      totalPro = totalPro + parseInt(food[0].totalPro);
 
       weeklyFat.push(food[0].totalFat);
-      totalFat = totalFat + food[0].totalFat;
+      totalFat = totalFat + parseInt(food[0].totalFat);
 
       weeklyCarb.push(food[0].totalCarb);
-      totalCarb = totalCarb + food[0].totalCarb;
+      totalCarb = totalCarb + parseInt(food[0].totalCarb);
     }
   }
 
@@ -370,6 +370,17 @@ const sendDiet = async(req, res, next) => {
   //check if coach is the id of the token
 
   client.diets = [...client.diets, diet.id];
+
+
+  client.notifications = {
+    clients: [...client.notifications.clients],
+    workouts: [...client.notifications.workouts],
+    diets: [...client.notifications.diets, diet.id],
+    messages: [...client.notifications.messages],
+    checkins: [...client.notifications.checkins]
+  }
+
+
 
   try {
     await client.save();
