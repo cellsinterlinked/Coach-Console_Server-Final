@@ -145,7 +145,7 @@ const createUser = async (req, res, next) => {
         email: createdUser.email,
         role: createdUser.role,
       },
-      'supersecret_dont-share',
+      process.env.JWT_KEY,
       { expiresIn: '1h' }
     );
   } catch (err) {
@@ -204,7 +204,7 @@ const createUser = async (req, res, next) => {
           email: createdUser.email,
           role: createdUser.role,
         },
-        'supersecret_dont_share',
+        process.env.JWT_KEY,
         { expiresIn: '1h' }
       );
     } catch (err) {
@@ -275,7 +275,7 @@ const login = async (req, res, next) => {
         email: existingUser.email,
         role: existingUser.role,
       },
-      'supersecret_dont_share',
+      process.env.JWT_KEY,
       { expiresIn: '1h' }
     );
   } catch (err) {
